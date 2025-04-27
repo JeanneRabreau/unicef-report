@@ -1,0 +1,426 @@
+---
+title: "UNICEF REPORT"
+subtitle: "A world growing older"
+author: "Jeanne Rabreau"
+date: "2025-04-25"
+format:
+  html:
+    toc: true
+    toc-location: right
+    embed-resources: true
+    code-fold: true
+    theme: materia
+---
+
+# Introduction
+
+The global population is experiencing **<span style="color:#6da8e1;">ageing</span>** at an unprecedented rate. According to the United Nations (2022), 1 in 6 people worldwide will be over 65 by 2050. While **<span style="color:#6da8e1;">ageing</span>** is a shared demographic trend, its speed and intensity vary significantly across regions.
+
+The aim of this report is to answer the following key questions:  
+<span style="color:#6da8e1;">1.</span> *Why are some regions **<span style="color:#6da8e1;">ageing</span>** faster than others?*  
+<span style="color:#6da8e1;">2.</span> *What are the economic and social impacts of this demographic shift?*  
+<span style="color:#6da8e1;">3.</span> *And above all, how can we deal with it?*
+
+*<span style="color:#6da8e1;">The key indicator used in this report is the **Old-Age Dependency Ratio (OADR)**, defined as the ratio between the population aged 65 and over and the number of people of working age (15–64).</span>*  
+*<span style="color:#6da8e1;">Data for this analysis was sourced from **UNICEF**.</span>*
+
+---
+
+## Key highlights
+
+- **<span style="color:#6da8e1;">Global aging trend:</span>** The old-age dependency ratio (OADR) has been rising steadily since the 1980s, highlighting a global phenomenon of aging populations.
+- **<span style="color:#6da8e1;">Regional disparities:</span>** Significant differences exist between regions, with higher OADRs in Europe and East Asia, and much lower values in Africa.
+- **<span style="color:#6da8e1;">Correlation between wealth and ageing:</span>** A higher GDP per capita is associated with a higher OADR, as wealthier countries experience longer life expectancy and lower birth rates.
+- **<span style="color:#6da8e1;">Demographic and economic challenges:</span>** In developed countries, the decline in the working-age population relative to the elderly population poses major risks to economic growth and the viability of pension systems.
+
+---
+
+## Global evolution of OADR: a growing challenge
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+
+import polars as pl
+from plotnine import *
+
+# Load the dataset
+df_indicator = pl.read_csv('/Users/jeanne/Desktop/UNICEF_Quarto/unicef_indicator_1.csv')
+```
+
+```{python}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 5
+#| fig-align: center
+#| message: false
+#| warning: false
+
+df_filtered = df_indicator.filter(
+    (pl.col("sex") == "Total") &
+    (pl.col("indicator") == "Old age dependency ratio")
+)
+
+df_global_avg = (
+    df_filtered
+    .group_by("time_period")
+    .agg(pl.col("obs_value").mean().alias("average_OADR"))
+    .sort("time_period")
+)
+
+df_plot = df_global_avg.to_pandas()
+
+(
+    ggplot(df_plot, aes(x="time_period", y="average_OADR")) +
+    geom_line(color="#6da8e1", size=1.2) +
+    labs(
+        x="Year",
+        y="Global average OADR (%)",
+        title="Global evolution of old-age dependency (1950–2023)"
+    ) +
+    theme_minimal()
+)
+```
+
+The evolution of the worldwide old-age dependency ratio (OADR) over time shows a clear upward trend since the 1980s. After a period of slow growth between 1950 and 1980, the OADR has accelerated steadily, reaching its highest level in 2023. This confirms **<span style="color:#6da8e1;">a global phenomenon of aging populations</span>**, which is intensifying over time.
+
+---
+
+## OADR in the world (2023)
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+
+import geopandas as gpd
+import polars as pl
+
+# Load the world map
+world = gpd.read_file('/Users/jeanne/Desktop/UNICEF_Quarto/countries.geojson.txt')
+
+# Load the OADR 2023 dataset
+df_oadr_2023 = df_indicator.filter(
+    (pl.col("sex") == "Total") &
+    (pl.col("indicator") == "Old age dependency ratio") &
+    (pl.col("time_period") == 2023)
+)
+
+# Convert OADR 2023 dataset into pandas
+df_oadr_2023_pd = df_oadr_2023.to_pandas()
+
+# Merge world map and OADR data
+world_oadr = world.merge(
+    df_oadr_2023_pd,
+    how="left",
+    left_on="name",
+    right_on="country"
+)
+
+#| echo: false
+#| fig-width: 10
+#| fig-height: 6
+#| fig-align: center
+#| message: false
+#| warning: false
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(12, 6))
+world_oadr.dropna(subset=["obs_value"]).plot(
+    column="obs_value",
+    cmap="Blues",
+    linewidth=0.8,
+    ax=ax,
+    edgecolor='0.8',
+    legend=True,
+    legend_kwds={"label": "OADR (%)", "shrink": 0.6}
+)
+
+ax.set_title("OADR around the world (2023)", fontsize=14)
+ax.axis("off")
+plt.show()
+```
+
+Although the overall trend in ageing is upwards, the map reveals **<span style="color:#6da8e1;">considerable heterogeneity between the world's regions</span>**. The OADR is particularly high in Europe, Japan and North America, reflecting a growing proportion of older people relative to the working population. Conversely, many parts of Africa still have low ratios.
+
+*Japan has one of the highest ratios, with an OADR of 50.28%, illustrating a particularly ageing population. In contrast, Niger has a very low ratio of just 1.68%, reflecting a still very young population.*
+
+---
+
+## Understanding the roots of demographic ageing
+
+### The wealth-ageing divide: GDP per capita vs OADR
+
+```{python}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 6
+#| fig-align: center
+#| message: false
+#| warning: false
+
+from plotnine import *
+import pandas as pd
+import polars as pl
+
+# Load indicator dataset
+df_indicator = pl.read_csv('/Users/jeanne/Desktop/UNICEF_Quarto/unicef_indicator_1.csv')
+
+# Load metadata dataset
+df_metadata = pl.read_csv(
+    '/Users/jeanne/Desktop/UNICEF_Quarto/unicef_metadata.csv',
+    schema_overrides={'Population, total': pl.Float64}
+)
+
+# Load continent mapping dataset
+continent_clean = pl.read_csv('/Users/jeanne/Desktop/UNICEF_Quarto/country-and-continent-codes-list-csv.csv')
+
+# Convert datasets to pandas
+df_indicator_pd = df_indicator.to_pandas()
+df_metadata_pd = df_metadata.to_pandas()
+continent_clean_pd = continent_clean.to_pandas()
+
+# Rename "Country_Name" column to "country"
+continent_clean_pd = continent_clean_pd.rename(columns={"Country_Name": "country"})
+
+# Merge indicator and metadata
+df_merge = df_indicator_pd.merge(
+    df_metadata_pd,
+    left_on=["country", "time_period"],
+    right_on=["country", "year"],
+    how="left"
+)
+
+# Merge with continent info
+df_scatter = df_merge.merge(
+    continent_clean_pd,
+    on="country",
+    how="left"
+)
+
+plot = (
+    ggplot(df_scatter.dropna(subset=["GDP per capita (constant 2015 US$)", "obs_value", "Continent_Name"])) +
+    aes(
+        x="GDP per capita (constant 2015 US$)",
+        y="obs_value",
+        color="Continent_Name"
+    ) +
+    geom_point(size=3) +
+    labs(
+        x="GDP per capita (US$)",
+        y="OADR (%)",
+        title="Correlation between GDP per capita and OADR (2023)",
+        color="Continent"
+    ) +
+    theme_minimal()
+)
+
+plot
+```
+The scattering of countries on this graph confirms that **<span style="color:#6da8e1;">ageing is more pronounced in high-income countries</span>**. There is a clear correlation between higher GDP per capita and a higher old-age dependency ratio.
+
+*In Africa, where the OADR remains low, the majority of countries have a GDP per capita of less than 5,000 USD. In Europe, on the other hand, where the OADR is much higher, many countries have a GDP per capita in excess of 30,000 USD, with some even exceeding 50,000 USD.*
+
+### Living longer, ageing more: Life expectancy vs OADR
+
+# Correlation between OADR and Life Expectancy (2023)
+
+```{python}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 6
+#| fig-align: center
+#| message: false
+#| warning: false
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Read CSV files
+unicef_indicator_1 = pd.read_csv('/Users/jeanne/Desktop/UNICEF_Quarto/unicef_indicator_1.csv')
+unicef_metadata = pd.read_csv('/Users/jeanne/Desktop/UNICEF_Quarto/unicef_metadata.csv')
+country_continent = pd.read_csv('/Users/jeanne/Desktop/UNICEF_Quarto/country-and-continent-codes-list-csv.csv')
+
+# Clean unicef_indicator_1 (OADR)
+o_adr_clean = unicef_indicator_1[
+    (unicef_indicator_1['sex'] == 'Total') &
+    (unicef_indicator_1['time_period'] == 2023)
+][['country', 'obs_value']]
+o_adr_clean = o_adr_clean.rename(columns={'obs_value': 'OADR'})
+
+# Clean unicef_metadata (Life Expectancy)
+life_exp_clean = unicef_metadata[['country', 'Life expectancy at birth, total (years)']]
+life_exp_clean = life_exp_clean.rename(columns={'Life expectancy at birth, total (years)': 'Life_Expectancy'})
+life_exp_clean = life_exp_clean.dropna()
+
+# Clean country_continent
+def simplify_country_name(name):
+    return name.split(',')[0].strip()
+
+continents_clean = country_continent[['Country_Name', 'Continent_Name']]
+continents_clean['country'] = continents_clean['Country_Name'].apply(simplify_country_name)
+continents_clean = continents_clean[['country', 'Continent_Name']]
+
+# Merge datasets
+merged_data = pd.merge(o_adr_clean, life_exp_clean, on='country', how='inner')
+final_data = pd.merge(merged_data, continents_clean, on='country', how='left')
+final_data = final_data.dropna(subset=['Continent_Name'])
+
+# Set continent colors
+continent_colors = {
+    "Africa": "#FFA500",
+    "Asia": "#ADD8E6",
+    "Europe": "#008000",
+    "North America": "#FFD700",
+    "Oceania": "#800080",
+    "South America": "#FF69B4"
+}
+
+# Create the scatterplot
+plt.figure(figsize=(10, 6))
+for continent, color in continent_colors.items():
+    subset = final_data[final_data['Continent_Name'] == continent]
+    plt.scatter(
+        subset['OADR'],
+        subset['Life_Expectancy'],
+        color=color,
+        label=continent,
+        alpha=0.7
+    )
+
+# Add linear regression
+sns.regplot(
+    x='OADR',
+    y='Life_Expectancy',
+    data=final_data,
+    scatter=False,
+    color='black',
+    line_kws={'linestyle': '--'}
+)
+
+# Customize the plot
+plt.title("Correlation between OADR and Life Expectancy (2023)", fontsize=16)
+plt.xlabel("Old-Age Dependency Ratio (%)", fontsize=12)
+plt.ylabel("Life Expectancy at Birth (years)", fontsize=12)
+plt.legend(title='Continent')
+plt.grid(True, linestyle='--', alpha=0.3)
+plt.tight_layout()
+plt.show()
+```
+The graph shows that a country's wealth  is a key factor explaining the rise in life expectancy. Indeed, **<span style="color:#6da8e1;">higher life expectancy mechanically leads to greater population ageing</span>**, resulting in a higher Old-Age Dependency Ratio (OADR).
+
+*For instance, Europe, made up largely of developed countries, has significantly higher OADRs than Africa, where life expectancy remains lower and populations are younger overall.*
+
+---
+
+## The economic and social cost of ageing: declining workforce in Europe
+
+```{python}
+#| echo: false
+#| fig-width: 8
+#| fig-height: 6
+#| fig-align: center
+#| message: false
+#| warning: false
+
+import pandas as pd
+from plotnine import *
+
+# Load datasets
+oadr = pd.read_csv('/Users/jeanne/Desktop/UNICEF_Quarto/unicef_indicator_1.csv')
+continent = pd.read_csv('/Users/jeanne/Desktop/UNICEF_Quarto/country-and-continent-codes-list-csv.csv')
+
+# Clean continent data
+continent_clean = continent[['Country_Name', 'Continent_Name']].rename(columns={
+    'Country_Name': 'country',
+    'Continent_Name': 'continent'
+})
+
+# Filter OADR for 'Total' and years 1950-2023
+oadr_total = oadr[
+    (oadr['sex'] == 'Total') &
+    (oadr['time_period'] >= 1950) &
+    (oadr['time_period'] <= 2023)
+][['country', 'time_period', 'obs_value']]
+
+# Merge with continent info
+oadr_total = oadr_total.merge(
+    continent_clean,
+    on='country',
+    how='left'
+)
+
+# Filter for Europe only
+oadr_europe = oadr_total[oadr_total['continent'] == 'Europe']
+
+# Compute yearly averages
+oadr_yearly = oadr_europe.groupby('time_period')['obs_value'].mean().reset_index()
+
+# Calculate working-age and older population percentages
+oadr_yearly['Older population (%)'] = (oadr_yearly['obs_value'] / (100 + oadr_yearly['obs_value'])) * 100
+oadr_yearly['Working-age population (%)'] = 100 - oadr_yearly['Older population (%)']
+
+# Reshape data for plotting
+oadr_long = oadr_yearly.melt(
+    id_vars='time_period',
+    value_vars=['Working-age population (%)', 'Older population (%)'],
+    var_name='Population Group',
+    value_name='Percentage'
+)
+
+# Create bar chart
+plot = (
+    ggplot(oadr_long) +
+    aes(
+        x="time_period",
+        y="Percentage",
+        fill="Population Group"
+    ) +
+    geom_bar(stat="identity", position="stack") +
+    scale_fill_manual(
+        values={
+            "Working-age population (%)": "#90EE90",  # Light green
+            "Older population (%)": "#006400"         # Dark green
+        }
+    ) +
+    labs(
+        title="Evolution of working-age and old-age population\nin Europe (1950–2023)",
+        x="Year",
+        y="Percentage (%)",
+        fill=""
+    ) +
+    theme_minimal() +
+    theme(legend_position="top")
+)
+
+plot
+```
+
+The evolution of the ratio of working-age people to older people in Europe reveals a worrying trend. **<span style="color:#6da8e1;">The proportion of 15-64 year-olds is gradually declining, while that of the over-65s is increasing, putting further pressure on economic and social systems</span>**. This demographic reversal represents a major challenge for productivity, public finances and the sustainability of pension systems.
+
+*In Europe, for example, there were just 13 elderly people for every 100 economically active people in 1950, compared with 31 elderly people for every 100 economically active people in 2023.*
+
+---
+
+# Conclusion and recommendations
+
+The aging of the world's population, highlighted by the evolution of the OADR, represents **<span style="color:#6da8e1;">a major challenge</span>** for productivity, the sustainability of pension systems and overall economic equilibrium. The graphs presented underline the scale of this phenomenon, particularly in developed countries, where the proportion of the elderly population continues to grow.
+
+**<span style="color:#6da8e1;">Fortunately, several solutions exist to mitigate the effects of demographic ageing</span>**:
+
+**<span style="color:#6da8e1;">1. Encourage migration:</span>** a young workforce from developing countries can compensate for the decline in the number of active workers.
+
+**<span style="color:#6da8e1;">2. Increase the retirement age:</span>** Adapt public policies to balance the demographic burden.
+
+**<span style="color:#6da8e1;">3. Stimulate the birth rate:</span>** Support families through birth incentive policies.
+
+**<span style="color:#6da8e1;">4. Invest in robotization and AI:</span>** Mitigate the shrinking workforce through technological advances.
+
+<br>
+
+**<span style="color:#6da8e1;">Global aging is a challenge, but also an opportunity to adapt our societies for a sustainable future!</span>**
+
+<img src="UNICEF_Logo.png" alt="UNICEF logo" width="300" style="margin-top: 20px;" />
